@@ -1,0 +1,1456 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0e1114">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Contador Bulonería</title>
+<style>
+/* Layout: lista de una columna para usar con una mano; cámara a pantalla completa con el número arriba y los botones abajo */
+:root{
+  --bg:#0e1114; --panel:#161b20; --panel2:#1e252c; --line:#2a333d;
+  --fg:#eef2f5; --mut:#8f9cab; --acc:#ffd23f; --accfg:#1a1600;
+  --aisi:#6cc3ff; --sae:#ff9f43; --ok:#3ddc84; --bad:#ff5d5d; --warn:#ffd23f;
+  --f:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--f);font-size:16px}
+body{padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:12px;min-height:52px;padding:0 16px;cursor:pointer;touch-action:manipulation}
+button:active{transform:scale(.98)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.primary{background:var(--acc);color:var(--accfg);border-color:var(--acc);font-weight:800}
+.danger{color:var(--bad)}
+.num{font-variant-numeric:tabular-nums}
+
+/* barra superior */
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);
+  padding:calc(8px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) 8px max(12px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:10px}
+.top h1{flex:1;margin:0;font-size:18px;font-weight:800;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top h1 small{color:var(--mut);font-weight:600;font-size:12px;letter-spacing:1px;text-transform:uppercase;display:block}
+#tBack{min-width:52px;padding:0;font-size:22px}
+#tRes{font-weight:700;white-space:nowrap}
+#tRes b{background:var(--acc);color:var(--accfg);border-radius:20px;padding:1px 8px;margin-left:6px}
+main{padding:12px max(12px,env(safe-area-inset-right,0px)) 32px max(12px,env(safe-area-inset-left,0px));max-width:720px;margin:0 auto}
+
+/* filtros + búsqueda */
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--panel);padding:4px;border-radius:14px;border:1px solid var(--line)}
+.seg button{border:0;background:transparent;min-height:46px;font-weight:700;color:var(--mut)}
+.seg button.on{background:var(--panel2);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
+.seg button[data-f="AISI"].on{color:var(--aisi)} .seg button[data-f="SAE"].on{color:var(--sae)}
+.search{position:relative;margin:10px 0 4px}
+.search input{width:100%;font:inherit;font-size:18px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:14px;min-height:56px;padding:0 48px 0 16px}
+.search button{position:absolute;right:4px;top:4px;min-height:48px;width:48px;padding:0;border:0;background:transparent;font-size:22px;color:var(--mut)}
+.hint{color:var(--mut);font-size:13px;margin:6px 2px 0}
+
+.fam{margin:18px 2px 6px;font-size:12px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--mut);display:flex;justify-content:space-between}
+.list{display:flex;flex-direction:column;gap:6px}
+.row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;text-align:left;width:100%;padding:10px 12px;min-height:60px;background:var(--panel)}
+.row .nm{font-weight:650;line-height:1.25;min-width:0;overflow-wrap:anywhere}
+.row .st{font-size:12px;color:var(--mut);margin-top:2px}
+.row .rt{text-align:right;font-size:13px;line-height:1.3}
+.row .rt b{display:block;font-size:17px}
+.tag{display:inline-block;font-size:11px;font-weight:900;letter-spacing:1px;padding:4px 7px;border-radius:7px;border:1.5px solid}
+.tag.AISI{color:var(--aisi);border-color:var(--aisi);background:rgba(108,195,255,.08)}
+.tag.SAE{color:var(--sae);border-color:var(--sae);background:rgba(255,159,67,.08)}
+.pos{color:var(--ok)} .neg{color:var(--bad)} .zero{color:var(--mut)}
+.empty{color:var(--mut);text-align:center;padding:40px 10px}
+
+/* producto */
+.pcard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.pcard h2{margin:8px 0 4px;font-size:22px;line-height:1.2;text-wrap:balance}
+.pcard .famtxt{color:var(--mut);font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.stat{background:var(--panel2);border-radius:12px;padding:10px;text-align:center}
+.stat span{display:block;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);font-weight:700}
+.stat b{display:block;font-size:26px;margin-top:2px;font-variant-numeric:tabular-nums}
+.modes{display:grid;gap:10px;margin:14px 0}
+.mode{min-height:84px;text-align:left;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:12px 18px;font-size:20px;font-weight:800}
+.mode small{font-size:13px;font-weight:500;opacity:.8}
+h3{font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mut);margin:20px 2px 8px}
+.batches{display:flex;flex-direction:column;gap:6px}
+.batch{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 6px 6px 14px}
+.batch .bn{font-size:20px;font-weight:800;min-width:64px}
+.batch .bm{flex:1;color:var(--mut);font-size:13px}
+.batch button{min-height:44px}
+.manual{display:flex;gap:8px;margin-top:10px}
+.manual input{flex:1;min-width:0;font:inherit;font-size:18px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:0 14px;min-height:52px}
+
+/* balanza */
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.field{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:2px;min-height:76px;text-align:left;padding:8px 14px;background:var(--panel)}
+.field span{font-size:12px;color:var(--mut);font-weight:700;letter-spacing:.6px;text-transform:uppercase}
+.field b{font-size:26px;font-variant-numeric:tabular-nums;min-height:32px}
+.field.act{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc) inset}
+.unit{color:var(--mut);font-size:14px;margin-top:10px;display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+.unit button{min-height:40px;font-size:14px}
+.bres{text-align:center;margin:12px 0 8px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px}
+.bres .big{font-size:64px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.bres .sub{color:var(--mut);margin-top:4px}
+.bres .w{color:var(--warn);font-weight:700;margin-top:6px}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.keypad button{min-height:64px;font-size:28px;font-weight:700;background:var(--panel)}
+.wide{width:100%;margin-top:10px;min-height:60px;font-size:18px}
+
+/* resultados */
+.sum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:30px;padding:6px 12px;font-size:14px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:middle}
+th{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--mut);background:var(--panel)}
+th:first-child,td:first-child{text-align:left}
+td:first-child{min-width:150px}
+td .tag{margin-right:6px;font-size:10px;padding:2px 5px}
+tr:last-child td{border-bottom:0}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.acts .full{grid-column:1/-1}
+
+/* cámara */
+#cam{position:fixed;inset:0;z-index:20;background:#000;display:flex;flex-direction:column}
+.camTop{padding:calc(6px + env(safe-area-inset-top,0px)) 12px 6px;background:rgba(14,17,20,.96);border-bottom:1px solid var(--line)}
+.camInfo{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:650;min-width:0}
+.camInfo span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.camNum{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+#cNum{font-size:72px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+#cStable{font-size:15px;font-weight:800;padding:6px 10px;border-radius:20px;background:var(--panel2);color:var(--mut)}
+#cStable.ok{background:rgba(61,220,132,.15);color:var(--ok)}
+.warns{display:flex;flex-wrap:wrap;gap:6px;min-height:0}
+.warns div{font-size:13px;font-weight:700;padding:4px 9px;border-radius:8px;background:rgba(255,210,63,.14);color:var(--warn)}
+.warns div.info{background:rgba(108,195,255,.12);color:var(--aisi)}
+#cStage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+#cWrap{position:relative}
+#cWrap video,#cWrap canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#cMsg{position:absolute;left:16px;right:16px;text-align:center;color:#fff;font-size:17px;line-height:1.4}
+.camBot{background:rgba(14,17,20,.96);border-top:1px solid var(--line);padding:8px 12px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px}
+.tools{display:flex;gap:6px}
+.tools button{flex:1;min-height:44px;font-size:14px;padding:0 6px;font-weight:700}
+.tools button.on{border-color:var(--acc);color:var(--acc)}
+.sens{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--mut)}
+.sens input{flex:1;accent-color:var(--acc);min-height:32px}
+.row2{display:grid;grid-template-columns:1fr 2fr;gap:8px}
+.row2 button{min-height:62px;font-size:18px;font-weight:800}
+.ctot{text-align:center;color:var(--mut);font-size:14px}
+.ctot b{color:var(--fg);font-size:16px}
+.frz{display:flex;align-items:center;justify-content:center;gap:14px;font-size:18px}
+.frz b{font-size:40px;min-width:90px;text-align:center;font-variant-numeric:tabular-nums}
+.frz button{min-width:64px;font-size:28px;font-weight:800}
+
+.idbtn{width:100%;margin-bottom:12px;min-height:76px;background:var(--panel2);border-color:var(--aisi)}
+.idbtn small{color:var(--mut)}
+.learn{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:4px}
+.learn > div:first-child{min-width:0;flex:1 1 180px}
+.learn b{display:block;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--mut)}
+.learn span{font-size:14px}
+.lbtns{display:flex;gap:6px}
+.lbtns button{min-height:44px;font-size:14px}
+.meas{font-size:17px;font-weight:700;line-height:1.35;padding:4px 0 2px}
+.meas .big{font-size:34px;font-weight:900;margin-right:8px}
+.meas .sm{font-size:13px;color:var(--mut);font-weight:600;display:block}
+.idhead{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:14px;color:var(--mut)}
+.idhead button{min-height:40px;font-size:13px;font-weight:800}
+.cands{display:flex;flex-direction:column;gap:6px}
+.cand{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;text-align:left;min-height:58px;padding:6px 12px;background:var(--panel2)}
+.cand .cn{font-weight:750;line-height:1.2;min-width:0;overflow-wrap:anywhere}
+.cand .cs{font-size:12px;color:var(--mut);font-weight:500}
+.cand .pc{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums}
+.cand.top{border-color:var(--ok)}
+.cand.low .pc{color:var(--warn)}
+.unsure{background:rgba(255,210,63,.14);color:var(--warn);font-weight:800;border-radius:10px;padding:8px 10px;font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:12px 18px;border-radius:12px;font-weight:700;z-index:50;max-width:90vw;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+@media (prefers-reduced-motion:reduce){button:active{transform:none}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <button id="tBack" aria-label="Volver" hidden>‹</button>
+  <h1 id="tTitle"><small>Depósito · demo</small>Contador de bulonería</h1>
+  <button id="tRes">Conteo<b id="tResN">0</b></button>
+</header>
+
+<main>
+  <!-- LISTA -->
+  <section id="home">
+    <button class="mode idbtn" id="bId">¿Qué tornillo es?<small>Poné 1 a 5 piezas iguales sobre una hoja A4 y te digo cuál es</small></button>
+    <div class="seg" id="seg">
+      <button data-f="all">Todos</button>
+      <button data-f="AISI">AISI</button>
+      <button data-f="SAE">SAE</button>
+    </div>
+    <div class="search">
+      <input id="q" type="text" placeholder="Buscar: m6 16, tuerca m8…" autocomplete="off" enterkeyhint="search" aria-label="Buscar producto">
+      <button id="qClr" aria-label="Borrar búsqueda" hidden>×</button>
+    </div>
+    <div class="hint" id="qInfo"></div>
+    <div id="list"></div>
+  </section>
+
+  <!-- PRODUCTO -->
+  <section id="product" hidden>
+    <div class="pcard">
+      <span class="tag" id="pTag"></span>
+      <h2 id="pName"></h2>
+      <div class="famtxt" id="pFam"></div>
+      <div class="stats">
+        <div class="stat"><span>Sistema</span><b id="pSys"></b></div>
+        <div class="stat"><span>Contado</span><b id="pCnt"></b></div>
+        <div class="stat"><span>Diferencia</span><b id="pDif"></b></div>
+      </div>
+    </div>
+    <div class="modes">
+      <button class="mode primary" id="bCam">Cámara en vivo<small>Desparramá las piezas sobre un fondo liso y apuntá</small></button>
+      <button class="mode" id="bBal">Balanza<small id="bBalSub">Contar por peso</small></button>
+    </div>
+    <div class="learn">
+      <div><b>Medida de referencia</b><span id="pLearn"></span></div>
+      <div class="lbtns"><button id="bTeach">Enseñar medida</button><button id="bForget" class="danger" hidden>Borrar</button></div>
+    </div>
+    <h3>Tandas sumadas</h3>
+    <div class="batches" id="pBatches"></div>
+    <div class="manual">
+      <input id="manN" type="number" inputmode="numeric" placeholder="Cargar cantidad a mano" aria-label="Cantidad a mano">
+      <button id="manAdd">Sumar</button>
+    </div>
+  </section>
+
+  <!-- BALANZA -->
+  <section id="scale" hidden>
+    <div class="pcard" style="padding:12px 14px">
+      <span class="tag" id="sTag"></span>
+      <div style="font-weight:700;margin-top:6px" id="sName"></div>
+    </div>
+
+    <div id="calBox">
+      <h3>Calibración de este producto</h3>
+      <div class="hint">Poné una cantidad conocida de piezas en la balanza (sin recipiente) y escribí cuánto pesan.</div>
+      <div class="fields">
+        <button class="field" data-f="calQ"><span>Cantidad de piezas</span><b></b></button>
+        <button class="field" data-f="calW"><span>Peso (g)</span><b></b></button>
+      </div>
+      <div class="unit" id="calPrev"></div>
+      <div class="acts">
+        <button id="calCancel" hidden>Cancelar</button>
+        <button id="calSave" class="primary full">Guardar calibración</button>
+      </div>
+    </div>
+
+    <div id="cntBox">
+      <div class="unit"><span id="uInfo"></span><button id="reCal">Recalibrar</button></div>
+      <div class="fields">
+        <button class="field" data-f="tara"><span>Tara recipiente (g)</span><b></b></button>
+        <button class="field" data-f="tot"><span>Peso total (g)</span><b></b></button>
+      </div>
+      <div class="bres">
+        <div class="big" id="bBig">–</div>
+        <div class="sub" id="bSub">Escribí el peso total</div>
+        <div class="w" id="bWarn" hidden></div>
+      </div>
+    </div>
+
+    <div class="keypad" id="kp">
+      <button>1</button><button>2</button><button>3</button>
+      <button>4</button><button>5</button><button>6</button>
+      <button>7</button><button>8</button><button>9</button>
+      <button>,</button><button>0</button><button aria-label="Borrar">⌫</button>
+    </div>
+    <button class="wide primary" id="balAdd" disabled>Sumar al total</button>
+    <button class="wide" id="kClr">Limpiar campo</button>
+  </section>
+
+  <!-- RESULTADOS -->
+  <section id="results" hidden>
+    <div class="sum" id="rSum"></div>
+    <div id="rBody"></div>
+    <div class="acts">
+      <button class="primary" id="rCsv">Exportar Excel (CSV)</button>
+      <button id="rWa">Compartir por WhatsApp</button>
+      <button class="full" id="rShare" hidden>Compartir archivo…</button>
+      <button class="full danger" id="rClear">Borrar todo el conteo</button>
+    </div>
+  </section>
+</main>
+
+<!-- CÁMARA -->
+<div id="cam" hidden>
+  <div class="camTop">
+    <div class="camInfo"><span class="tag" id="cTag"></span><span id="cName"></span></div>
+    <div class="camNum" id="cNumRow"><span id="cNum">0</span><span id="cStable">iniciando…</span></div>
+    <div class="meas" id="cMeas" hidden></div>
+    <div class="warns" id="cWarn"></div>
+  </div>
+  <div id="cStage">
+    <div id="cWrap"><video id="cVid" playsinline muted autoplay></video><canvas id="cOv"></canvas></div>
+    <div id="cMsg"></div>
+  </div>
+  <div class="camBot" id="cCtl">
+    <div class="tools">
+      <button id="cBg"></button>
+      <button id="cA4"></button>
+      <button id="cTorch" hidden>Linterna</button>
+    </div>
+    <label class="sens">Menos<input type="range" id="cSens" min="-40" max="40" step="2" aria-label="Sensibilidad">Más</label>
+    <div class="row2">
+      <button id="cClose">Salir</button>
+      <button id="cFix" class="primary">Fijar conteo</button>
+    </div>
+    <div class="ctot">Total del producto: <b id="cTot" class="num">0</b></div>
+  </div>
+  <div class="camBot" id="cIdP" hidden>
+    <div class="idhead"><span id="idStat">Midiendo…</span><button id="idFilt"></button></div>
+    <div class="cands" id="idCands"></div>
+    <div class="row2">
+      <button id="idClose">Salir</button>
+      <button id="idTorch" hidden>Linterna</button>
+    </div>
+  </div>
+  <div class="camBot" id="cTeachP" hidden>
+    <div class="ctot" id="tStat">Poné hasta 5 piezas de este producto sobre la hoja</div>
+    <div class="row2">
+      <button id="tClose">Salir</button>
+      <button id="tSave" class="primary" disabled>Guardar medida</button>
+    </div>
+  </div>
+  <div class="camBot" id="cFrz" hidden>
+    <div class="ctot" id="fHead"></div>
+    <div class="frz"><button id="fMinus" aria-label="Restar uno">−</button><b id="fN">0</b><button id="fPlus" aria-label="Sumar uno">+</button></div>
+    <div class="ctot">Total del producto: <b id="fTot" class="num">0</b></div>
+    <div class="row2">
+      <button id="fUndo" class="danger">Deshacer</button>
+      <button id="fNext" class="primary">Contar otra tanda</button>
+    </div>
+    <button id="fDone">Terminar</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<!-- ===================== VISIÓN (sin librerías, todo en el celu) ===================== -->
+<script id="cvjs">
+const CV = (() => {
+  let cap = 0, g, t, fg, tm, lab, lab2, ov, stack;
+  function ensure(N) {
+    if (N <= cap) return;
+    cap = N;
+    g = new Uint8Array(N); t = new Uint8Array(N); fg = new Uint8Array(N); tm = new Uint8Array(N);
+    lab = new Int32Array(N); lab2 = new Int32Array(N); ov = new Uint8ClampedArray(N * 4); stack = new Int32Array(N);
+  }
+  // desenfoque de caja separable (radio r)
+  function blur(src, tmp, w, h, r) {
+    const d = 2 * r + 1;
+    for (let y = 0; y < h; y++) {
+      const o = y * w; let s = 0;
+      for (let k = -r; k <= r; k++) s += src[o + Math.min(w - 1, Math.max(0, k))];
+      for (let x = 0; x < w; x++) {
+        tmp[o + x] = (s / d) | 0;
+        s += src[o + Math.min(w - 1, x + r + 1)] - src[o + Math.max(0, x - r)];
+      }
+    }
+    for (let x = 0; x < w; x++) {
+      let s = 0;
+      for (let k = -r; k <= r; k++) s += tmp[Math.min(h - 1, Math.max(0, k)) * w + x];
+      for (let y = 0; y < h; y++) {
+        src[y * w + x] = (s / d) | 0;
+        s += tmp[Math.min(h - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+      }
+    }
+  }
+  // morfología binaria 3x3
+  function dilate(a, b, w, h) {
+    for (let y = 0; y < h; y++) { const o = y * w;
+      for (let x = 0; x < w; x++) { const i = o + x; b[i] = a[i] | (x > 0 ? a[i - 1] : 0) | (x < w - 1 ? a[i + 1] : 0); } }
+    for (let y = 0; y < h; y++) { const o = y * w;
+      for (let x = 0; x < w; x++) { const i = o + x; a[i] = b[i] | (y > 0 ? b[i - w] : 0) | (y < h - 1 ? b[i + w] : 0); } }
+  }
+  function erode(a, b, w, h) {
+    for (let y = 0; y < h; y++) { const o = y * w;
+      for (let x = 0; x < w; x++) { const i = o + x; b[i] = a[i] & (x > 0 ? a[i - 1] : a[i]) & (x < w - 1 ? a[i + 1] : a[i]); } }
+    for (let y = 0; y < h; y++) { const o = y * w;
+      for (let x = 0; x < w; x++) { const i = o + x; a[i] = b[i] & (y > 0 ? b[i - w] : b[i]) & (y < h - 1 ? b[i + w] : b[i]); } }
+  }
+  // componentes conexas (8 vecinos) con momentos
+  function label(mask, val, L, w, h) {
+    const N = w * h; L.fill(0, 0, N);
+    const comps = [];
+    for (let i = 0; i < N; i++) {
+      if (mask[i] !== val || L[i]) continue;
+      const id = comps.length + 1;
+      const c = { id, first: i, area: 0, sx: 0, sy: 0, sxx: 0, syy: 0, sxy: 0, x0: w, y0: h, x1: 0, y1: 0, touch: false };
+      let sp = 0; stack[sp++] = i; L[i] = id;
+      while (sp) {
+        const p = stack[--sp]; const y = (p / w) | 0, x = p - y * w;
+        c.area++; c.sx += x; c.sy += y; c.sxx += x * x; c.syy += y * y; c.sxy += x * y;
+        if (x < c.x0) c.x0 = x; if (x > c.x1) c.x1 = x; if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y;
+        const xl = x > 0, xr = x < w - 1, yu = y > 0, yd = y < h - 1;
+        if (!xl || !xr || !yu || !yd) c.touch = true;
+        let q;
+        if (xl) { q = p - 1; if (mask[q] === val && !L[q]) { L[q] = id; stack[sp++] = q; } }
+        if (xr) { q = p + 1; if (mask[q] === val && !L[q]) { L[q] = id; stack[sp++] = q; } }
+        if (yu) {
+          q = p - w; if (mask[q] === val && !L[q]) { L[q] = id; stack[sp++] = q; }
+          if (xl) { q = p - w - 1; if (mask[q] === val && !L[q]) { L[q] = id; stack[sp++] = q; } }
+          if (xr) { q = p - w + 1; if (mask[q] === val && !L[q]) { L[q] = id; stack[sp++] = q; } }
+        }
+        if (yd) {
+          q = p + w; if (mask[q] === val && !L[q]) { L[q] = id; stack[sp++] = q; }
+          if (xl) { q = p + w - 1; if (mask[q] === val && !L[q]) { L[q] = id; stack[sp++] = q; } }
+          if (xr) { q = p + w + 1; if (mask[q] === val && !L[q]) { L[q] = id; stack[sp++] = q; } }
+        }
+      }
+      comps.push(c);
+    }
+    return comps;
+  }
+  function mom(A, sx, sy, sxx, syy, sxy) {
+    const mx = sx / A, my = sy / A;
+    const a = sxx / A - mx * mx, b = syy / A - my * my, c = sxy / A - mx * my;
+    const tr = (a + b) / 2, d = Math.sqrt(((a - b) / 2) ** 2 + c * c);
+    return { mx, my, a, b, c, l1: tr + d, l2: Math.max(0, tr - d), th: 0.5 * Math.atan2(2 * c, a - b) };
+  }
+  // hoja A4 = región clara más grande que no toca el borde, con proporción 1:1,41.
+  // Devuelve también los agujeros (fondo encerrado dentro de una pieza) por id de pieza.
+  function findSheet(fgComps, w, h) {
+    const bc = label(fg, 0, lab2, w, h);
+    let best = null;
+    for (const c of bc) if (!c.touch && (!best || c.area > best.area)) best = c;
+    if (!best || best.area < w * h * 0.08) return null;
+    let A = best.area, sx = best.sx, sy = best.sy, sxx = best.sxx, syy = best.syy, sxy = best.sxy;
+    const inner = new Set();
+    for (const c of fgComps) {
+      if (!c.touch && c.x0 > best.x0 && c.x1 < best.x1 && c.y0 > best.y0 && c.y1 < best.y1) {
+        A += c.area; sx += c.sx; sy += c.sy; sxx += c.sxx; syy += c.syy; sxy += c.sxy; inner.add(c.id);
+      }
+    }
+    const holes = new Map();
+    for (const c of bc) {
+      if (c === best || c.touch || c.first % w === 0) continue;
+      const pid = lab[c.first - 1];
+      if (!inner.has(pid)) continue;
+      holes.set(pid, (holes.get(pid) || 0) + c.area);
+      A += c.area; sx += c.sx; sy += c.sy; sxx += c.sxx; syy += c.syy; sxy += c.sxy;
+    }
+    const m = mom(A, sx, sy, sxx, syy, sxy);
+    const a = Math.sqrt(12 * m.l1), b = Math.sqrt(12 * m.l2);
+    const fill = (a * b) / A, ratio = a / b;
+    if (fill < 0.85 || fill > 1.15 || ratio < 1.22 || ratio > 1.65) return null;
+    return { x0: best.x0, y0: best.y0, x1: best.x1, y1: best.y1, mmpp: Math.sqrt(62370 / A), inner, holes };
+  }
+
+  // ---- medición de perfil (sirve igual para piezas medidas y para perfiles teóricos) ----
+  // p: anchos en mm a lo largo del eje, step: mm por muestra
+  function profFeat(p0, step) {
+    const n0 = p0.length;
+    const p = new Float32Array(n0);
+    for (let i = 0; i < n0; i++) p[i] = (p0[Math.max(0, i - 1)] + p0[i] + p0[Math.min(n0 - 1, i + 1)]) / 3;
+    const pct = (arr, q) => { const s = Array.from(arr).filter(v => v > 0).sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(s.length * q))] : 0; };
+    let d = pct(p, 0.35);
+    let a = 0, b = n0 - 1;
+    while (a < b && p[a] < 0.3 * d) a++;
+    while (b > a && p[b] < 0.3 * d) b--;
+    const n = b - a + 1, Lt = n * step;
+    d = pct(p.subarray(a, b + 1), 0.35);
+    const thr = 1.25 * d;
+    const at = (dir, k) => p[dir > 0 ? a + k : b - k];
+    function head(dir) {
+      let s = -1; const lim = Math.floor(n * 0.45);
+      for (let k = 0; k < lim; k++) if (at(dir, k) > thr) { s = k; break; }
+      if (s < 0 || s * step > Math.max(1.5, 0.15 * Lt)) return null;
+      let e = s; while (e + 1 < n && at(dir, e + 1) > thr) e++;
+      const len = e + 1;
+      if (len * step < 0.6 || len > 0.6 * n) return null;
+      let hW = 0, area = 0;
+      for (let k = 0; k <= e; k++) { const v = at(dir, k); area += v; if (v > hW) hW = v; }
+      // forma: ancho medio en el tramo externo (15-45 %) e interno (55-85 %) de la cabeza, sin los bordes borrosos
+      const k1 = Math.floor(len * 0.15), k2 = Math.max(k1 + 1, Math.round(len * 0.45));
+      let so = 0, si = 0;
+      for (let k = k1; k < k2; k++) { so += at(dir, k); si += at(dir, e - k); }
+      return { len: len * step, area: area * step, hW, tapOut: so / (k2 - k1) / hW, tapIn: si / (k2 - k1) / hW };
+    }
+    const hA = head(1), hB = head(-1);
+    const hd = hA && hB ? (hA.area >= hB.area ? hA : hB) : (hA || hB);
+    if (!hd) return { Lt, Ls: Lt, d, hasHead: 0, hL: 0, hW: d, tapOut: 1, tapIn: 1 };
+    return { Lt, Ls: Lt - hd.len, d, hasHead: 1, hL: hd.len, hW: hd.hW, tapOut: hd.tapOut, tapIn: hd.tapIn };
+  }
+
+  // medidas de una pieza en mm
+  function pieceFeat(c, w, mmpp, holeA) {
+    const m = mom(c.area, c.sx, c.sy, c.sxx, c.syy, c.sxy);
+    const co = Math.cos(m.th), si = Math.sin(m.th);
+    const half = Math.ceil(Math.hypot(c.x1 - c.x0 + 1, c.y1 - c.y0 + 1)) + 2;
+    const cnt = new Float32Array(2 * half + 1);
+    const AB = 72, rmax = new Float32Array(AB);
+    let vmin = 1e9, vmax = -1e9;
+    for (let y = c.y0; y <= c.y1; y++) {
+      const o = y * w;
+      for (let x = c.x0; x <= c.x1; x++) {
+        if (lab[o + x] !== c.id) continue;
+        const dx = x - m.mx, dy = y - m.my;
+        const u = dx * co + dy * si, v = -dx * si + dy * co;
+        cnt[Math.floor(u + half + 0.5)]++;
+        if (v < vmin) vmin = v; if (v > vmax) vmax = v;
+        const r = Math.hypot(dx, dy);
+        const ai = Math.min(AB - 1, ((Math.atan2(dy, dx) + Math.PI) / (2 * Math.PI) * AB) | 0);
+        if (r > rmax[ai]) rmax[ai] = r;
+      }
+    }
+    let a = 0, b = cnt.length - 1;
+    while (a < b && !cnt[a]) a++;
+    while (b > a && !cnt[b]) b--;
+    const prof = new Float32Array(b - a + 1);
+    for (let i = a; i <= b; i++) prof[i - a] = cnt[i] * mmpp;
+    let rM = 0, rm = 1e9;
+    for (let i = 0; i < AB; i++) if (rmax[i] > 0) { if (rmax[i] > rM) rM = rmax[i]; if (rmax[i] < rm) rm = rmax[i]; }
+    const Din = holeA > 0 ? 2 * Math.sqrt(holeA / Math.PI) * mmpp : 0;
+    return {
+      side: profFeat(prof, mmpp),
+      top: { Deq: 2 * Math.sqrt((c.area + holeA) / Math.PI) * mmpp, E1: prof.length * mmpp, E2: (vmax - vmin + 1) * mmpp, Din, hex: rm > 0 ? rM / rm : 1 },
+      hole: Din > 1.2 ? 1 : 0
+    };
+  }
+
+  const COL = { ok: [61, 220, 132], clump: [255, 210, 63], len: [255, 140, 66], other: [255, 64, 64], big: [150, 150, 150] };
+
+  // o: {bg, sens, a4, measure, lenCheck}
+  function analyze(px, w, h, o) {
+    const N = w * h; ensure(N);
+    for (let i = 0, j = 0; i < N; i++, j += 4) g[i] = (px[j] * 77 + px[j + 1] * 150 + px[j + 2] * 29) >> 8;
+    blur(g, t, w, h, w > 600 ? 1 : 2);
+    const hist = new Uint32Array(256);
+    for (let i = 0; i < N; i++) hist[g[i]]++;
+    let sum = 0; for (let k = 0; k < 256; k++) sum += k * hist[k];
+    let wB = 0, sB = 0, best = -1, thr = 128, m0 = 0, m1 = 255;
+    for (let k = 0; k < 256; k++) {
+      wB += hist[k]; if (!wB) continue;
+      const wF = N - wB; if (!wF) break;
+      sB += k * hist[k];
+      const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF);
+      if (v > best) { best = v; thr = k; m0 = mB; m1 = mF; }
+    }
+    const res = { count: 0, comps: [], warn: [], w, h, ov, sheet: null, lenMed: 0, ncomp: 0 };
+    if (m1 - m0 < 20) { res.warn.push('Poco contraste: no veo piezas'); return res; }
+    const light = o.bg !== 'dark';
+    const s = o.sens || 0;
+    const T = Math.max(1, Math.min(254, light ? thr + s : thr - s));
+    if (light) for (let i = 0; i < N; i++) fg[i] = g[i] <= T ? 1 : 0;
+    else for (let i = 0; i < N; i++) fg[i] = g[i] > T ? 1 : 0;
+    dilate(fg, tm, w, h); erode(fg, tm, w, h);
+    erode(fg, tm, w, h); dilate(fg, tm, w, h);
+    const comps = label(fg, 1, lab, w, h);
+    res.ncomp = comps.length;
+
+    let sheet = null;
+    if (o.a4 && light) {
+      sheet = findSheet(comps, w, h);
+      res.sheet = sheet;
+      if (!sheet) res.warn.push('A4: no veo la hoja entera');
+    }
+    const minA = Math.max(10, N * 0.00003);
+    let cut = 0; const cand = [];
+    for (const c of comps) {
+      if (c.area < minA) continue;
+      if (sheet) { if (!sheet.inner.has(c.id)) continue; }
+      else if (c.touch) { if (c.area >= minA * 3) cut++; continue; }
+      cand.push(c);
+    }
+    if (cut) res.warn.push(cut === 1 ? 'Hay 1 pieza cortada en el borde' : `Hay ${cut} piezas cortadas en el borde`);
+    if (!cand.length) return res;
+
+    let areas = cand.map(c => c.area).sort((x, y) => x - y);
+    let med = areas[areas.length >> 1];
+    areas = areas.filter(x => x >= med * 0.3);
+    med = areas[areas.length >> 1];
+    let clumps = 0, bigs = 0;
+    for (const c of cand) {
+      const r = c.area / med;
+      if (r < 0.3) continue;
+      let n = 1, kind = 'ok';
+      if (r > 8) { n = 0; kind = 'big'; bigs++; }
+      else if (r >= 1.5) { n = Math.round(r); kind = 'clump'; clumps++; }
+      const m = mom(c.area, c.sx, c.sy, c.sxx, c.syy, c.sxy);
+      c.cx = m.mx; c.cy = m.my; c.n = n; c.kind = kind;
+      if (sheet && kind === 'ok') {
+        c.len = (Math.sqrt(12 * m.l1) + 2) * sheet.mmpp;
+        if (o.measure) c.F = pieceFeat(c, w, sheet.mmpp, sheet.holes.get(c.id) || 0);
+      }
+      res.comps.push(c);
+      res.count += n;
+    }
+    if (clumps) res.warn.push('Piezas tocándose: separalas');
+    if (bigs) res.warn.push('Hay algo grande que no cuento (¿mano, sombra?)');
+    if (sheet) {
+      const ls = res.comps.filter(c => c.len).map(c => c.len).sort((x, y) => x - y);
+      if (ls.length) {
+        const lm = ls[ls.length >> 1]; res.lenMed = lm;
+        if (o.lenCheck !== false && ls.length >= 3) {
+          let odd = 0;
+          for (const c of res.comps) if (c.len && Math.abs(c.len - lm) > Math.max(2, lm * 0.12)) { c.kind = 'len'; odd++; }
+          if (odd) res.warn.push(odd === 1 ? '1 pieza con largo distinto' : `${odd} piezas con largo distinto`);
+        }
+      }
+    }
+    return res;
+  }
+  // pinta contornos según c.kind (llamar después de ajustar kinds)
+  function paint(res) {
+    const { w, h } = res, N = w * h;
+    ov.fill(0, 0, N * 4);
+    if (!res.comps.length) return;
+    const col = new Int16Array((res.ncomp + 1) * 3).fill(-1);
+    for (const c of res.comps) { const k = COL[c.kind] || COL.ok; col[c.id * 3] = k[0]; col[c.id * 3 + 1] = k[1]; col[c.id * 3 + 2] = k[2]; }
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = y * w + x, L = lab[i];
+        if (!L || col[L * 3] < 0) continue;
+        const edge = !(x > 0 && lab[i - 1] === L && x < w - 1 && lab[i + 1] === L && y > 0 && lab[i - w] === L && y < h - 1 && lab[i + w] === L);
+        const j = i * 4;
+        ov[j] = col[L * 3]; ov[j + 1] = col[L * 3 + 1]; ov[j + 2] = col[L * 3 + 2]; ov[j + 3] = edge ? 255 : 55;
+      }
+    }
+  }
+  return { analyze, paint, profFeat };
+})();
+if (typeof module !== 'undefined') module.exports = CV;
+
+</script>
+<script id="idjs">
+// Medidas teóricas de cada producto (a partir del nombre) y comparación con lo medido
+const ID = (() => {
+  const profFeat = (typeof CV !== 'undefined' ? CV : require('./cv.js')).profFeat;
+  const INCH = { '1-8': 3.175, '1-4': 6.35, '5-16': 7.94, '3-8': 9.525, '3-4': 19.05, '5-8': 15.875 };
+  const TF = 0.88; // ancho visible de la rosca respecto del nominal
+  const HEX_S = { 3.175: 5.5, 4: 7, 4.2: 7, 5: 8, 6: 10, 6.35: 11.1, 7.94: 12.7, 8: 13, 9.525: 14.3, 10: 16, 12: 18, 14: 21 };
+  const HEX_K = { 4: 2.8, 5: 3.5, 6: 4, 8: 5.3, 9.525: 6, 10: 6.4, 12: 7.5, 14: 8.8 };
+  const CIL_DK = { 4: 7, 5: 8.5, 6: 10, 8: 13, 10: 16, 12: 18 };
+  const BOT_DK = { 4: 7.6, 5: 9.5, 6: 10.5, 8: 14, 10: 17.5 };
+  const BOT_K = { 4: 2.2, 5: 2.75, 6: 3.3, 8: 4.4, 10: 5.5 };
+  const FRES_DK = { 3.175: 6, 4: 8, 5: 10, 6: 12, 8: 16, 10: 20 };
+  const TANQ_DK = { 4: 8, 5: 9.5, 6: 12, 8: 16 };
+  const TANQ_K = { 4: 3.1, 5: 3.7, 6: 4.6, 8: 6 };
+  const WASH_OD = { 5: 10, 6: 12, 8: 16, 10: 20, 12: 24 };
+  function lk(tab, d) {
+    if (tab[d] != null) return tab[d];
+    let best = null;
+    for (const k of Object.keys(tab)) if (best == null || Math.abs(k - d) < Math.abs(best - d)) best = +k;
+    return tab[best] * d / best;
+  }
+  // segmentos [largo, ancho] o [largo, anchoInicio, anchoFin] desde la punta de la cabeza
+  // suaviza el perfil teórico como lo ve la cámara (~0,7 mm de borroneo)
+  function soft(a, r = 3) {
+    const o = new Array(a.length);
+    for (let i = 0; i < a.length; i++) { let s = 0, n = 0; for (let k = -r; k <= r; k++) { const j = i + k; s += j < 0 || j >= a.length ? 0 : a[j]; n++; } o[i] = s / n; }
+    return o;
+  }
+  function mk(segs) {
+    const a = [];
+    for (const [len, w0, w1] of segs) {
+      const n = Math.max(1, Math.round(len / 0.1));
+      for (let i = 0; i < n; i++) a.push(w1 == null ? w0 : w0 + (w1 - w0) * (n > 1 ? i / (n - 1) : 0));
+    }
+    return a;
+  }
+  function dome(dk, k) { // cabeza redondeada (botón): de la punta a la base
+    const R = dk / 2, rho = (R * R + k * k) / (2 * k), n = Math.max(2, Math.round(k / 0.1)), a = [];
+    for (let i = 0; i < n; i++) { const hh = k - (i + 0.5) * k / n; a.push(Math.max(0.35 * dk, 2 * Math.sqrt(Math.max(0, rho * rho - (hh + rho - k) ** 2)))); }
+    return a;
+  }
+  function parse(name) {
+    let d = null, L = null, inch = false;
+    let m = name.match(/\bM(\d+(?:[.,]\d+)?)(?:\s*x\s*(\d+(?:[.,]\d+)?))?/i);
+    if (m) { d = parseFloat(m[1].replace(',', '.')); if (m[2]) L = parseFloat(m[2].replace(',', '.')); return { d, L, inch }; }
+    m = name.match(/(\d+-\d+|\d+(?:[.,]\d+)?)\s*x\s*(\d+-\d+|\d+(?:[.,]\d+)?)/);
+    if (m) {
+      if (INCH[m[1]]) { d = INCH[m[1]]; inch = true; }
+      else if (/autoperf|parker/i.test(name) && m[1] === '8') { d = 4.2; inch = true; } // calibre #8
+      else d = parseFloat(m[1].replace(',', '.'));
+      if (INCH[m[2]]) L = INCH[m[2]];
+      else { L = parseFloat(m[2].replace(',', '.')); if (inch && L <= 6) L *= 25.4; }
+      return { d, L, inch };
+    }
+    m = name.match(/\b(\d+-\d+)\b/);
+    if (m && INCH[m[1]]) return { d: INCH[m[1]], L: null, inch: true };
+    m = name.match(/\bD\s*(\d+)/i);
+    if (m) return { d: +m[1], L: null, inch };
+    m = name.match(/(\d+(?:[.,]\d+)?)\s*mm/);
+    if (m) return { d: parseFloat(m[1].replace(',', '.')), L: null, inch };
+    return { d, L, inch };
+  }
+  const SIDE = 'side', TOP = 'top';
+  function specOf(name) {
+    const s = name.toLowerCase();
+    let { d, L } = parse(name);
+    const side = (segs, rough) => ({ view: SIDE, F: profFeat(soft(mk(segs)), 0.1), rough: !!rough });
+    const sideA = (arr, rough) => ({ view: SIDE, F: profFeat(soft(arr), 0.1), rough: !!rough });
+    const top = (Deq, E1, E2, Din, hex, rough) => ({ view: TOP, F: { Deq, E1, E2, Din, hex }, hole: Din > 0 ? 1 : 0, rough: !!rough });
+    if (/arandela/.test(s)) {
+      if (/chapista/.test(s)) return top(25, 25, 25, 6.8, 1);
+      if (/grower/.test(s)) return top(1.85 * d, 1.85 * d, 1.85 * d, d + 0.2, 1, true);
+      if (/grande/.test(s)) return top(3 * d, 3 * d, 3 * d, d + 0.4, 1);
+      const od = lk(WASH_OD, d); return top(od, od, od, d + 0.4, 1);
+    }
+    if (/tuerca/.test(s)) {
+      const S = lk(HEX_S, d);
+      if (/cupla/.test(s)) { const m = name.match(/x\s*(\d+)\s*SAE/i); return side([[m ? +m[1] : 3 * d, 1.12 * S]]); }
+      if (/ciega/.test(s)) return top(1.05 * S, 1.1 * S, 1.05 * S, 0, 1.13);
+      return top(1.05 * S, 1.1 * S, 1.05 * S, 0.85 * d, 1.13);
+    }
+    if (/seeger/.test(s)) {
+      if (/exterior/.test(s)) return top(1.3 * d, 1.4 * d, 1.3 * d, 0.93 * d, 1.08, true);
+      return top(1.05 * d, 1.1 * d, 1.05 * d, 0.85 * d, 1.08, true);
+    }
+    if (/mariposa macho/.test(s)) return side([[2.6 * d, 5.2 * d, 2 * d], [L, TF * d]], true);
+    if (/mariposa/.test(s)) return top(3.2 * d, 5.2 * d, 2.2 * d, 0.85 * d, 1.5, true);
+    if (/gusano/.test(s)) return side([[L, TF * d]]);
+    if (/espiga/.test(s)) { const m = name.match(/(\d+)\s*x\s*(\d+)/); return side([[m ? +m[2] : 15, m ? +m[1] : 8]]); }
+    if (/inserto/.test(s)) { const db = d + 3, ln = 1.5 * d + 6.5; return side([[1, db + 4], [ln - 1, db]], true); }
+    if (/remache/.test(s)) { return side([[26, 0.55 * d], [0.8, 2 * d], [L, d]], true); }
+    if (/llave allen/.test(s)) return side([[4, 22], [66, d]], true);
+    if (/bisagra/.test(s)) return top(52, 63, 34, 4, 1.3, true);
+    if (/tornillo/.test(s) && d && L) {
+      const tw = TF * d;
+      if (/c\.?\s?hex/.test(s)) { const S = lk(HEX_S, d); return side([[lk(HEX_K, d), 1.12 * S], [L, tw]]); }
+      if (/allen c\.cil/.test(s)) return side([[d, lk(CIL_DK, d)], [L, tw]]);
+      if (/allen c\.bot/.test(s)) return sideA(dome(lk(BOT_DK, d), lk(BOT_K, d)).concat(mk([[L, tw]])));
+      if (/fresada/.test(s)) { const dk = lk(FRES_DK, d), cone = (dk - d) / 2; return side([[0.3, dk], [cone, dk, d], [Math.max(1, L - cone - 0.3), tw]]); }
+      if (/c\.tanque/.test(s)) { const dk = lk(TANQ_DK, d); return side([[lk(TANQ_K, d), 0.8 * dk, dk], [L, tw]]); }
+      if (/parker|fijadora|autoperforante/.test(s)) return side([[3.2, 7, 8.5], [L, tw]], true);
+    }
+    return null;
+  }
+
+  // ---- comparación ----
+  const SIDE_K = [['Lt', 1, 0.05, 1], ['Ls', 1, 0.05, 1], ['d', 0.55, 0, 1.2], ['hW', 0.9, 0.1, 0.6], ['hL', 0.8, 0.25, 0.4]];
+  const TOP_K = [['Deq', 0.8, 0.06, 1], ['Din', 0.7, 0.08, 1], ['E1', 1, 0.08, 0.6], ['E2', 1, 0.08, 0.6]];
+  function d2side(m, t, k) {
+    let D = 0;
+    for (const [f, a, r, w] of SIDE_K) { const s = Math.max(a, r * t[f]) * k; D += w * ((m[f] - t[f]) / s) ** 2; }
+    if (m.hasHead !== t.hasHead) D += 6;
+    else if (t.hasHead) { D += 0.5 * ((m.tapOut - t.tapOut) / 0.15) ** 2 + 0.5 * ((m.tapIn - t.tapIn) / 0.15) ** 2; }
+    return D;
+  }
+  function d2top(m, t, k) {
+    let D = 0;
+    for (const [f, a, r, w] of TOP_K) { const s = Math.max(a, r * t[f]) * k; D += w * ((m[f] - t[f]) / s) ** 2; }
+    D += 0.5 * ((m.hex - t.hex) / 0.06) ** 2;
+    return D;
+  }
+  // M: medida {side, top, hole}; S: spec {view, F, hole}
+  function scoreSpec(M, S, k = 1) {
+    if (!S) return 0;
+    let D;
+    if (S.view === SIDE) { if (M.hole) return 0; D = d2side(M.side, S.F, k); }
+    else { D = d2top(M.top, S.F, k); if (M.hole !== S.hole) D += 9; }
+    return 100 * Math.exp(-D / 6);
+  }
+  // mediana campo a campo de varias medidas
+  function medF(list) {
+    if (!list.length) return null;
+    const med = a => { const s = a.slice().sort((x, y) => x - y); return s[s.length >> 1]; };
+    const out = { side: {}, top: {}, hole: med(list.map(x => x.hole)) >= 0.5 ? 1 : 0 };
+    for (const f of Object.keys(list[0].side)) out.side[f] = med(list.map(x => x.side[f]));
+    out.side.hasHead = out.side.hasHead >= 0.5 ? 1 : 0;
+    for (const f of Object.keys(list[0].top)) out.top[f] = med(list.map(x => x.top[f]));
+    return out;
+  }
+  function learnedSpec(refs, view) {
+    if (!refs || !refs.length) return null;
+    const M = medF(refs);
+    return view === TOP ? { view, F: M.top, hole: M.hole } : { view: SIDE, F: M.side, hole: 0 };
+  }
+  // ranking de candidatos. products: [{i, name, ...}], specs[i], learn[id]
+  function rank(M, products, specs, learn) {
+    const out = [];
+    for (const p of products) {
+      const S = specs[p.i];
+      let sc = S ? scoreSpec(M, S) : 0, src = 'teórica';
+      const ref = learn[p.id];
+      if (ref && ref.length) {
+        const LS = learnedSpec(ref, S ? S.view : (M.hole ? TOP : SIDE));
+        const sl = scoreSpec(M, LS, 0.8);
+        if (sl > sc) { sc = sl; src = 'aprendida'; }
+      }
+      out.push({ p, sc, src });
+    }
+    return out.sort((a, b) => b.sc - a.sc);
+  }
+  const NOM = [[3.175, '1/8"'], [4, 'M4'], [4.2, '#8'], [5, 'M5'], [6, 'M6'], [6.35, '1/4"'], [7.94, '5/16"'], [8, 'M8'], [9.525, '3/8"'], [10, 'M10'], [12, 'M12'], [14, 'M14']];
+  function nominal(dSil) {
+    const d = dSil / TF; let bm = null, bi = null;
+    for (const n of NOM) { const isIn = /["#]/.test(n[1]); if (isIn) { if (!bi || Math.abs(n[0] - d) < Math.abs(bi[0] - d)) bi = n; } else if (!bm || Math.abs(n[0] - d) < Math.abs(bm[0] - d)) bm = n; }
+    return Math.abs(bi[0] - d) < Math.abs(bm[0] - d) - 0.2 ? bi[1] : bm[1];
+  }
+  function headShape(F) {
+    if (!F.hasHead) return 'sin cabeza';
+    if (F.tapIn < 0.8 && F.tapOut > 0.85) return 'fresada';
+    if (F.tapOut < 0.82) return 'botón / redondeada';
+    if (F.hL / F.d > 1.0) return 'cilíndrica';
+    return 'hexagonal / tanque';
+  }
+  // ¿esta pieza no coincide con lo esperado? (chequeo mientras cuento, ±1,5 mm)
+  function mismatch(F, S) {
+    if (!F || !S || !S.F) return null;
+    if (S.view === TOP) {
+      if (Math.abs(F.top.Deq - S.F.Deq) > 1.5) return 'diámetro';
+      if (S.hole && Math.abs(F.top.Din - S.F.Din) > 1.5) return 'agujero';
+      return null;
+    }
+    if (F.hole) return 'forma';
+    if (Math.abs(F.side.d - S.F.d) / TF > 1.5) return 'diámetro';
+    if (Math.abs(F.side.Ls - S.F.Ls) > 1.5) return 'largo';
+    return null;
+  }
+  return { mismatch, specOf, scoreSpec, medF, rank, learnedSpec, nominal, headShape, parse, TF };
+})();
+if (typeof module !== 'undefined') module.exports = ID;
+
+</script>
+
+<!-- ===================== APP ===================== -->
+<script>
+'use strict';
+// Catálogo de EJEMPLO (inventado). Reemplazalo por el tuyo: "Nombre|stock" por línea.
+const RAW = { AISI: `Arandela plana M6 AISI|500
+Arandela plana M8 AISI|400
+Arandela Grower M8 AISI|300
+Gusano M6 x 8 AISI|120
+Mariposa M6 AISI|80
+Tornillo C.Hex M6 x 20 AISI|250
+Tornillo C.Hex M8 x 30 AISI|200
+Allen C.Botón M5 x 12 AISI|150
+Allen C.Cil M6 x 25 AISI|150
+Allen C.Fresada M5 x 16 AISI|100
+Tornillo philips C.Tanque M4 x 20 AISI|300
+Tornillo autoperforante T1 8 x 13 AISI|500
+Tuerca M6 x 1 AISI|600
+Tuerca M8 x 1.25 AISI|450
+Tuerca autofrenante M8 AISI|200
+Remache pop 4 x 10 AISI|1000`, SAE: `Arandela plana M10 SAE|300
+Arandela Grower M10 SAE|250
+Gusano M8 x 12 SAE|100
+Tornillo C.Hex M10 x 40 SAE|150
+Tornillo C.Hex M6 x 16 SAE|400
+Tornillo philips C.Fresada M4 x 12 SAE|300
+Tornillo autoperforante T1 8 x 3-4 SAE|400
+Traba seeger exterior D 20 SAE|100
+Traba seeger interior D 35 SAE|80
+Inserto roscado M6 SAE|120
+Tuerca M10 x 1.5 SAE|300
+Tuerca Cupla M8 x 1.25 x 24 SAE|60` };
+const FAMS = ['Arandelas', 'Gusanos', 'Mariposas', 'Tornillos C.Hex', 'Allen C.Botón', 'Allen C.Cil', 'Allen C.Fresada', 'Philips', 'Parker / Autoperforantes', 'Tuercas', 'Trabas seeger', 'Insertos roscados', 'Remaches pop', 'Otros'];
+function famOf(n) {
+  const s = n.toLowerCase();
+  if (s.startsWith('arandela')) return 'Arandelas';
+  if (s.startsWith('gusano')) return 'Gusanos';
+  if (s.startsWith('mariposa')) return 'Mariposas';
+  if (/autoperf|parker/.test(s)) return 'Parker / Autoperforantes';
+  if (/c\.hex/.test(s)) return 'Tornillos C.Hex';
+  if (/allen c\.bot/.test(s)) return 'Allen C.Botón';
+  if (/allen c\.cil/.test(s)) return 'Allen C.Cil';
+  if (/allen c\.fres/.test(s)) return 'Allen C.Fresada';
+  if (/philips/.test(s)) return 'Philips';
+  if (s.startsWith('tuerca')) return 'Tuercas';
+  if (/seeger/.test(s)) return 'Trabas seeger';
+  if (s.startsWith('inserto')) return 'Insertos roscados';
+  if (s.startsWith('remache')) return 'Remaches pop';
+  return 'Otros';
+}
+const norm = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/,/g, '.');
+const P = [];
+for (const cat of ['AISI', 'SAE']) {
+  for (const line of RAW[cat].split('\n')) {
+    const k = line.lastIndexOf('|'); if (k < 0) continue;
+    const name = line.slice(0, k), stock = +line.slice(k + 1);
+    const n = norm(name);
+    P.push({ i: P.length, id: cat + '|' + name, cat, name, stock, fam: famOf(name),
+      hay: n + ' ' + cat.toLowerCase() + ' ' + n.replace(/\s+/g, '') });
+  }
+}
+P.sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }) || a.cat.localeCompare(b.cat));
+P.forEach((p, i) => p.i = i);
+const SPECS = P.map(p => { try { return ID.specOf(p.name); } catch (e) { return null; } });
+const baseName = n => n.replace(/\s+(SAE|INOX|AISI)\b/g, '').replace(/\s+/g, ' ').trim();
+
+// ---------- almacenamiento ----------
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { toast('No se pudo guardar en el celu'); } }
+};
+const S = {
+  counts: LS.get('bc_counts', {}),
+  cal: LS.get('bc_cal', {}),
+  tara: LS.get('bc_tara', 0),
+  learn: LS.get('bc_learn', {}),
+  set: Object.assign({ filter: 'all', bg: 'light', a4: false, sens: 0, res: 480 }, LS.get('bc_set', {}))
+};
+const saveCounts = () => LS.set('bc_counts', S.counts);
+const saveSet = () => LS.set('bc_set', S.set);
+const batchesOf = id => (S.counts[id] && S.counts[id].b) || [];
+const totalOf = id => batchesOf(id).reduce((a, b) => a + b.n, 0);
+const isCounted = id => batchesOf(id).length > 0;
+function addBatch(id, n, m) {
+  if (!S.counts[id]) S.counts[id] = { b: [] };
+  S.counts[id].b.push({ n, m, t: Date.now() });
+  saveCounts(); return S.counts[id].b.length - 1;
+}
+function delBatch(id, idx) {
+  const b = batchesOf(id); b.splice(idx, 1);
+  if (!b.length) delete S.counts[id];
+  saveCounts();
+}
+
+// ---------- utilidades ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = n => Number(n).toLocaleString('es-AR');
+const fmtd = (n, d = 2) => Number(n).toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
+const sgn = d => (d > 0 ? '+' : d < 0 ? '−' : '') + fmt(Math.abs(d));
+const dcls = d => d > 0 ? 'pos' : d < 0 ? 'neg' : 'zero';
+const tag = c => `<span class="tag ${c}">${c}</span>`;
+const pad = n => String(n).padStart(2, '0');
+const fdate = t => { const d = new Date(t); return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+const ftime = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+let toastT;
+function toast(msg) { const el = $('#toast'); el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 2200); }
+function vibe(ms = 30) { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} }
+// botón que pide un segundo toque para confirmar
+function armed(btn, label, fn) {
+  if (btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = btn.dataset.orig; fn(); return; }
+  btn.dataset.orig = btn.textContent; btn.dataset.armed = 1; btn.textContent = label;
+  setTimeout(() => { if (btn.dataset.armed) { delete btn.dataset.armed; btn.textContent = btn.dataset.orig; } }, 3000);
+}
+
+// ---------- navegación ----------
+let cur = 'home', curP = null;
+const SCREENS = ['home', 'product', 'scale', 'results'];
+function go(s, push = true) {
+  const prev = cur;
+  SCREENS.forEach(id => $('#' + id).hidden = id !== s);
+  cur = s;
+  $('#tBack').hidden = s === 'home';
+  $('#tRes').hidden = s === 'results';
+  const t = $('#tTitle');
+  if (s === 'home') t.innerHTML = '<small>Depósito · demo</small>Contador de bulonería';
+  else if (s === 'results') t.innerHTML = '<small>Resultados</small>Conteo del día';
+  else if (s === 'scale') t.innerHTML = '<small>Modo</small>Balanza';
+  else t.innerHTML = '<small>Producto</small>' + esc(P[curP].fam);
+  updBadge();
+  if (s === 'home') renderList();
+  if (s === 'product') renderProduct();
+  if (s === 'scale') renderScale();
+  if (s === 'results') renderResults();
+  if (push) history.pushState({ s, p: curP }, '');
+  if (s !== 'home' || prev !== 'home') window.scrollTo(0, s === 'home' ? homeScroll : 0);
+}
+let homeScroll = 0;
+window.addEventListener('scroll', () => { if (cur === 'home') homeScroll = window.scrollY; }, { passive: true });
+window.addEventListener('popstate', e => {
+  if (C.on) { closeCam(); return; }
+  const st = e.state || { s: 'home' };
+  if (st.p != null) curP = st.p;
+  go(st.s || 'home', false);
+});
+$('#tBack').onclick = () => history.back();
+$('#tRes').onclick = () => go('results');
+function updBadge() { $('#tResN').textContent = Object.keys(S.counts).filter(isCounted).length; }
+
+// ---------- lista ----------
+const qEl = $('#q');
+function setFilter(f) { S.set.filter = f; saveSet(); document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.f === f)); renderList(); }
+document.querySelectorAll('#seg button').forEach(b => b.onclick = () => setFilter(b.dataset.f));
+qEl.addEventListener('input', () => { $('#qClr').hidden = !qEl.value; renderList(); });
+$('#qClr').onclick = () => { qEl.value = ''; $('#qClr').hidden = true; renderList(); qEl.focus(); };
+function renderList() {
+  const toks = norm(qEl.value).split(/\s+/).filter(Boolean);
+  const f = S.set.filter;
+  const items = P.filter(p => (f === 'all' || p.cat === f) && toks.every(t => p.hay.includes(t)));
+  const by = {};
+  for (const p of items) (by[p.fam] = by[p.fam] || []).push(p);
+  let h = '';
+  for (const fam of FAMS) {
+    const arr = by[fam]; if (!arr) continue;
+    h += `<div class="fam"><span>${fam}</span><span>${arr.length}</span></div><div class="list">`;
+    for (const p of arr) {
+      let rt = '';
+      if (isCounted(p.id)) { const c = totalOf(p.id), d = c - p.stock; rt = `<div class="rt"><b class="num">${fmt(c)}</b><span class="${dcls(d)} num">${d === 0 ? 'OK' : sgn(d)}</span></div>`; }
+      else rt = `<div class="rt zero">sin contar</div>`;
+      h += `<button class="row" data-i="${p.i}">${tag(p.cat)}<div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="st num">Sistema: ${fmt(p.stock)}</div></div>${rt}</button>`;
+    }
+    h += '</div>';
+  }
+  $('#list').innerHTML = h || '<div class="empty">No encontré productos con esa búsqueda.</div>';
+  $('#qInfo').textContent = toks.length || f !== 'all' ? `${items.length} producto${items.length === 1 ? '' : 's'}` : `${P.length} productos · ${P.filter(p => p.cat === 'AISI').length} AISI · ${P.filter(p => p.cat === 'SAE').length} SAE`;
+}
+$('#list').addEventListener('click', e => { const r = e.target.closest('.row'); if (!r) return; curP = +r.dataset.i; go('product'); });
+
+// ---------- producto ----------
+const MLBL = { cam: 'Cámara', bal: 'Balanza', man: 'A mano' };
+function renderProduct() {
+  const p = P[curP], c = totalOf(p.id), d = c - p.stock, counted = isCounted(p.id);
+  $('#pTag').className = 'tag ' + p.cat; $('#pTag').textContent = p.cat === 'AISI' ? 'AISI · inoxidable' : 'SAE · acero común';
+  $('#pName').textContent = p.name; $('#pFam').textContent = p.fam;
+  $('#pSys').textContent = fmt(p.stock);
+  $('#pCnt').textContent = counted ? fmt(c) : '–';
+  $('#pDif').textContent = counted ? (d === 0 ? 'OK' : sgn(d)) : '–';
+  $('#pDif').className = counted ? dcls(d) : 'zero';
+  const cal = S.cal[p.id];
+  $('#bBalSub').textContent = cal ? `Calibrada: ${fmtd(cal.u, 3)} g por pieza` : 'Hay que calibrarla primero (10 piezas)';
+  const refs = S.learn[p.id];
+  if (refs && refs.length) { const t = measText(ID.medF(refs)); $('#pLearn').textContent = `${refs.length} pieza${refs.length === 1 ? '' : 's'} medidas · ${t.big} · ${t.line}`; }
+  else $('#pLearn').textContent = SPECS[p.i] ? 'Uso la medida teórica. Enseñale 5 piezas para que no se equivoque.' : 'Sin medida teórica para esta pieza. Enseñale 5 piezas.';
+  $('#bForget').hidden = !(refs && refs.length);
+  const b = batchesOf(p.id);
+  $('#pBatches').innerHTML = b.length ? b.map((x, i) => `<div class="batch"><span class="bn num">${fmt(x.n)}</span><span class="bm">${MLBL[x.m] || x.m} · ${ftime(x.t)}</span><button data-del="${i}" class="danger">Borrar</button></div>`).join('')
+    : '<div class="hint">Todavía no contaste este producto.</div>';
+}
+$('#pBatches').addEventListener('click', e => {
+  const bt = e.target.closest('[data-del]'); if (!bt) return;
+  armed(bt, '¿Seguro?', () => { delBatch(P[curP].id, +bt.dataset.del); renderProduct(); toast('Tanda borrada'); });
+});
+$('#manAdd').onclick = () => {
+  const n = parseInt($('#manN').value, 10);
+  if (!Number.isFinite(n) || n === 0) { toast('Escribí una cantidad'); return; }
+  addBatch(P[curP].id, n, 'man'); $('#manN').value = ''; renderProduct(); toast(`Sumaste ${fmt(n)}`);
+};
+$('#bBal').onclick = () => go('scale');
+$('#bCam').onclick = () => openCam('count');
+$('#bTeach').onclick = () => openCam('teach');
+$('#bId').onclick = () => openCam('id');
+$('#bForget').onclick = () => armed($('#bForget'), '¿Seguro?', () => { delete S.learn[P[curP].id]; LS.set('bc_learn', S.learn); renderProduct(); toast('Medidas borradas'); });
+// texto de lo medido
+function measText(M) {
+  if (!M) return { big: '–', line: '', sm: '' };
+  if (M.hole) { const T = M.top; return { big: `Ø ${fmtd(T.Deq, 1)}`, line: `agujero ${fmtd(T.Din, 1)} mm · ${T.hex > 1.1 ? 'hexagonal' : 'redonda'}`, sm: 'Vista de arriba (tuerca, arandela, traba…)' }; }
+  const F = M.side;
+  return {
+    big: ID.nominal(F.d),
+    line: `vástago ${fmtd(F.Ls, 1)} · total ${fmtd(F.Lt, 1)} mm`,
+    sm: `Ø rosca ${fmtd(F.d, 1)} mm · ` + (F.hasHead ? `cabeza ${fmtd(F.hW, 1)} × ${fmtd(F.hL, 1)} mm, ${ID.headShape(F)}` : 'sin cabeza')
+  };
+}
+// medida esperada del producto: la aprendida si hay, si no la teórica (salvo piezas raras)
+function expSpec(p) {
+  const S0 = SPECS[p.i], refs = S.learn[p.id];
+  if (refs && refs.length) return ID.learnedSpec(refs, S0 ? S0.view : (ID.medF(refs).hole ? 'top' : 'side'));
+  return S0 && !S0.rough ? S0 : null;
+}
+
+// ---------- balanza ----------
+const FV = { calQ: '10', calW: '', tara: '', tot: '' };
+let actF = 'tot', calEditing = false;
+const pnum = s => { const v = parseFloat(String(s).replace(',', '.')); return Number.isFinite(v) ? v : NaN; };
+function renderScale() {
+  const p = P[curP], cal = S.cal[p.id];
+  $('#sTag').className = 'tag ' + p.cat; $('#sTag').textContent = p.cat; $('#sName').textContent = p.name;
+  FV.tara = S.tara ? String(S.tara).replace('.', ',') : '';
+  if (!cal || calEditing) {
+    $('#calBox').hidden = false; $('#cntBox').hidden = true; $('#balAdd').hidden = true;
+    $('#calCancel').hidden = !cal;
+    if (!calEditing) { FV.calQ = '10'; FV.calW = ''; }
+    if (!['calQ', 'calW'].includes(actF)) actF = 'calW';
+  } else {
+    $('#calBox').hidden = true; $('#cntBox').hidden = false; $('#balAdd').hidden = false;
+    if (!['tara', 'tot'].includes(actF)) actF = 'tot';
+    $('#uInfo').textContent = `${fmtd(cal.u, 3)} g por pieza (calibrado con ${fmt(cal.q)} u)`;
+  }
+  paintFields();
+}
+function paintFields() {
+  document.querySelectorAll('#scale .field').forEach(f => {
+    const k = f.dataset.f; f.querySelector('b').textContent = FV[k] || '';
+    f.classList.toggle('act', k === actF);
+  });
+  // vista previa calibración
+  const q = pnum(FV.calQ), w = pnum(FV.calW);
+  $('#calPrev').textContent = q > 0 && w > 0 ? `Peso por pieza: ${fmtd(w / q, 3)} g` : '';
+  // cálculo
+  const cal = S.cal[P[curP].id];
+  const big = $('#bBig'), sub = $('#bSub'), warn = $('#bWarn'), add = $('#balAdd');
+  warn.hidden = true; add.disabled = true; add.textContent = 'Sumar al total';
+  if (!cal) return;
+  const tot = pnum(FV.tot), tara = pnum(FV.tara) || 0;
+  if (!(tot > 0)) { big.textContent = '–'; sub.textContent = 'Escribí el peso total'; return; }
+  const net = tot - tara;
+  if (net <= 0) { big.textContent = '–'; sub.textContent = 'El peso total es menor que la tara'; return; }
+  const x = net / cal.u, n = Math.round(x), dev = Math.abs(x - n);
+  big.textContent = fmt(n);
+  sub.textContent = `≈ ${fmtd(x, 2)} piezas · neto ${fmtd(net, 1)} g`;
+  if (dev > 0.3) { warn.hidden = false; warn.textContent = `No da un número entero (±${fmtd(dev, 2)}): puede haber una pieza distinta mezclada o hay que recalibrar`; }
+  if (n > 0) { add.disabled = false; add.textContent = `Sumar ${fmt(n)} al total`; }
+}
+document.querySelectorAll('#scale .field').forEach(f => f.onclick = () => { actF = f.dataset.f; paintFields(); });
+$('#kp').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const k = b.textContent; let v = FV[actF] || '';
+  if (k === '⌫') v = v.slice(0, -1);
+  else if (k === ',') { if (!v.includes(',')) v = (v || '0') + ','; }
+  else if (v.replace(',', '').length < 9) v = (v === '0' ? '' : v) + k;
+  FV[actF] = v; vibe(10);
+  if (actF === 'tara') { S.tara = pnum(v) || 0; LS.set('bc_tara', S.tara); }
+  paintFields();
+});
+$('#kClr').onclick = () => { FV[actF] = ''; if (actF === 'tara') { S.tara = 0; LS.set('bc_tara', 0); } paintFields(); };
+$('#calSave').onclick = () => {
+  const q = pnum(FV.calQ), w = pnum(FV.calW);
+  if (!(q > 0) || !Number.isInteger(q)) { toast('La cantidad tiene que ser un número entero'); actF = 'calQ'; paintFields(); return; }
+  if (!(w > 0)) { toast('Escribí el peso de las piezas'); actF = 'calW'; paintFields(); return; }
+  S.cal[P[curP].id] = { u: w / q, q, w, t: Date.now() }; LS.set('bc_cal', S.cal);
+  calEditing = false; actF = 'tot'; FV.tot = ''; toast('Calibración guardada'); renderScale();
+};
+$('#reCal').onclick = () => { const c = S.cal[P[curP].id]; calEditing = true; FV.calQ = String(c.q); FV.calW = String(c.w).replace('.', ','); actF = 'calW'; renderScale(); };
+$('#calCancel').onclick = () => { calEditing = false; actF = 'tot'; renderScale(); };
+$('#balAdd').onclick = () => {
+  const cal = S.cal[P[curP].id]; const n = Math.round((pnum(FV.tot) - (pnum(FV.tara) || 0)) / cal.u);
+  if (!(n > 0)) return;
+  addBatch(P[curP].id, n, 'bal'); vibe(40);
+  toast(`Sumaste ${fmt(n)} · total ${fmt(totalOf(P[curP].id))}`);
+  FV.tot = ''; paintFields();
+};
+
+// ---------- resultados ----------
+function countedList() {
+  return P.filter(p => isCounted(p.id)).map(p => {
+    const b = batchesOf(p.id), c = totalOf(p.id);
+    return { p, c, d: c - p.stock, t: Math.max(...b.map(x => x.t)) };
+  });
+}
+function renderResults() {
+  const L = countedList();
+  const falt = L.filter(x => x.d < 0).length, sob = L.filter(x => x.d > 0).length, ok = L.length - falt - sob;
+  $('#rSum').innerHTML = `<span class="chip">${L.length} contados</span><span class="chip neg">${falt} faltan</span><span class="chip pos">${sob} sobran</span><span class="chip">${ok} OK</span>`;
+  if (!L.length) { $('#rBody').innerHTML = '<div class="empty">Todavía no contaste nada hoy.</div>'; }
+  else {
+    const rows = FAMS.flatMap(f => L.filter(x => x.p.fam === f)).map(x =>
+      `<tr data-i="${x.p.i}"><td>${tag(x.p.cat)}${esc(x.p.name)}</td><td class="num"><b>${fmt(x.c)}</b></td><td class="num">${fmt(x.p.stock)}</td><td class="num ${dcls(x.d)}"><b>${x.d === 0 ? 'OK' : sgn(x.d)}</b></td></tr>`).join('');
+    $('#rBody').innerHTML = `<div class="tbl"><table><thead><tr><th>Producto</th><th>Contado</th><th>Sistema</th><th>Dif.</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  ['#rCsv', '#rWa', '#rShare', '#rClear'].forEach(s => $(s).disabled = !L.length);
+}
+$('#rBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-i]'); if (!tr) return; curP = +tr.dataset.i; go('product'); });
+function buildCsv() {
+  const q = v => { v = String(v); return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const lines = [['Categoría', 'Nombre', 'Contado', 'Sistema', 'Diferencia', 'Fecha y hora'].join(';')];
+  for (const x of countedList()) lines.push([x.p.cat, x.p.name, x.c, x.p.stock, x.d, fdate(x.t)].map(q).join(';'));
+  return '﻿' + lines.join('\r\n');
+}
+const fileName = () => { const d = new Date(); return `conteo-buloneria-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.csv`; };
+$('#rCsv').onclick = () => {
+  const blob = new Blob([buildCsv()], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fileName();
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast('Archivo descargado');
+};
+$('#rWa').onclick = () => {
+  const L = countedList(); const d = new Date();
+  let txt = `*Conteo de bulonería* – ${fdate(d)}\n`;
+  for (const cat of ['AISI', 'SAE']) {
+    const arr = L.filter(x => x.p.cat === cat); if (!arr.length) continue;
+    txt += `\n*${cat}*\n`;
+    for (const x of arr) txt += `• ${x.p.name}: ${x.c} (sist. ${x.p.stock}, ${x.d === 0 ? 'OK' : (x.d > 0 ? '+' : '') + x.d})\n`;
+  }
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+};
+try {
+  const testF = new File(['x'], 't.csv', { type: 'text/csv' });
+  if (navigator.canShare && navigator.canShare({ files: [testF] })) $('#rShare').hidden = false;
+} catch (e) {}
+$('#rShare').onclick = async () => {
+  try { await navigator.share({ files: [new File([buildCsv()], fileName(), { type: 'text/csv' })], title: 'Conteo bulonería' }); } catch (e) {}
+};
+$('#rClear').onclick = () => armed($('#rClear'), 'Tocá de nuevo para borrar todo', () => { S.counts = {}; saveCounts(); renderResults(); updBadge(); toast('Conteo borrado'); });
+
+// ---------- cámara ----------
+const C = { on: false, mode: 'count', stream: null, track: null, raf: 0, last: 0, frozen: false, hist: [], shown: 0, since: 0, res: null, bIdx: -1, torch: false, wake: null, warnStr: '', tracks: [], meds: [], candT: 0 };
+const vid = $('#cVid'), ovc = $('#cOv'), octx = ovc.getContext('2d');
+const pc = document.createElement('canvas'), pctx = pc.getContext('2d', { willReadFrequently: true });
+const oc = document.createElement('canvas'), occtx = oc.getContext('2d');
+function camMsg(s) { $('#cMsg').textContent = s || ''; $('#cMsg').hidden = !s; }
+function paintTools() {
+  $('#cBg').textContent = S.set.bg === 'light' ? 'Fondo claro' : 'Fondo oscuro';
+  $('#cA4').textContent = 'Escala A4'; $('#cA4').classList.toggle('on', S.set.a4); $('#cA4').disabled = S.set.bg !== 'light';
+  $('#cTorch').classList.toggle('on', C.torch); $('#idTorch').classList.toggle('on', C.torch);
+  $('#cSens').value = S.set.sens;
+}
+function setMode(mode) {
+  C.mode = mode; C.hist = []; C.shown = 0; C.since = 0; C.tracks = []; C.meds = []; C.frozen = false; C.warnStr = '';
+  const count = mode === 'count';
+  if (mode === 'id') { $('#cTag').hidden = true; $('#cName').textContent = '¿Qué tornillo es?'; }
+  else { const p = P[curP]; $('#cTag').hidden = false; $('#cTag').className = 'tag ' + p.cat; $('#cTag').textContent = p.cat; $('#cName').textContent = (mode === 'teach' ? 'Enseñar: ' : '') + p.name; }
+  $('#cNumRow').hidden = !count; $('#cCtl').hidden = !count; $('#cMeas').hidden = count;
+  $('#cIdP').hidden = mode !== 'id'; $('#cTeachP').hidden = mode !== 'teach'; $('#cFrz').hidden = true;
+  if (count) $('#cTot').textContent = fmt(totalOf(P[curP].id));
+  $('#cNum').textContent = '0'; $('#cStable').textContent = 'iniciando…'; $('#cStable').className = ''; $('#cWarn').innerHTML = '';
+  $('#cMeas').innerHTML = '<span class="big">…</span>';
+  $('#tSave').disabled = true; $('#tStat').textContent = 'Poné hasta 5 piezas de este producto sobre la hoja A4';
+  paintCands(null);
+  octx.clearRect(0, 0, ovc.width, ovc.height);
+  paintTools();
+}
+async function openCam(mode = 'count') {
+  $('#cam').hidden = false;
+  setMode(mode);
+  history.pushState({ s: cur, p: curP, cam: 1 }, '');
+  C.on = true; C.torch = false;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    camMsg('La cámara solo funciona si abrís la página con https:// (Netlify, GitHub Pages) o desde localhost.'); return;
+  }
+  camMsg('Abriendo cámara…');
+  try {
+    C.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } });
+  } catch (e) {
+    camMsg(e && e.name === 'NotAllowedError' ? 'No hay permiso para la cámara. Habilitalo en el candado de la barra de direcciones de Chrome.' : 'No pude abrir la cámara (' + (e && e.name || 'error') + ').');
+    return;
+  }
+  if (!C.on) { C.stream.getTracks().forEach(t => t.stop()); return; }
+  C.track = C.stream.getVideoTracks()[0];
+  vid.srcObject = C.stream;
+  try { await vid.play(); } catch (e) {}
+  camMsg('');
+  try { const caps = C.track.getCapabilities ? C.track.getCapabilities() : {}; $('#cTorch').hidden = $('#idTorch').hidden = !caps.torch; } catch (e) { $('#cTorch').hidden = $('#idTorch').hidden = true; }
+  try { if ('wakeLock' in navigator) C.wake = await navigator.wakeLock.request('screen'); } catch (e) {}
+  fitCam();
+  C.raf = requestAnimationFrame(step);
+}
+function closeCam() {
+  C.on = false; cancelAnimationFrame(C.raf);
+  if (C.stream) C.stream.getTracks().forEach(t => t.stop());
+  C.stream = null; C.track = null; vid.srcObject = null;
+  try { C.wake && C.wake.release(); } catch (e) {} C.wake = null;
+  $('#cam').hidden = true;
+  if (cur === 'product') renderProduct();
+}
+function fitCam() {
+  if (!C.on) return;
+  const st = $('#cStage'), cw = st.clientWidth, ch = st.clientHeight;
+  const vw = vid.videoWidth || 640, vh = vid.videoHeight || 480, s = Math.min(cw / vw, ch / vh);
+  const W = Math.floor(vw * s), H = Math.floor(vh * s), dpr = Math.min(2, window.devicePixelRatio || 1);
+  const wr = $('#cWrap'); wr.style.width = W + 'px'; wr.style.height = H + 'px';
+  ovc.width = Math.round(W * dpr); ovc.height = Math.round(H * dpr);
+}
+window.addEventListener('resize', fitCam);
+vid.addEventListener('loadedmetadata', fitCam);
+function step(ts) {
+  if (!C.on) return;
+  C.raf = requestAnimationFrame(step);
+  if (C.frozen || vid.readyState < 2 || !vid.videoWidth) return;
+  if (ts - C.last < (C.mode === 'count' ? 85 : 180)) return;
+  C.last = ts;
+  const vw = vid.videoWidth, vh = vid.videoHeight, idm = C.mode !== 'count';
+  const LT = idm ? 1280 : Math.round(S.set.res * 16 / 9); // lado largo a procesar
+  const w = Math.min(vw, Math.round(LT * vw / Math.max(vw, vh))), h = Math.round(vh * w / vw);
+  if (pc.width !== w || pc.height !== h) { pc.width = w; pc.height = h; oc.width = w; oc.height = h; C.tracks = []; fitCam(); }
+  pctx.drawImage(vid, 0, 0, w, h);
+  const exp = idm ? null : (S.set.a4 && S.set.bg === 'light' ? expSpec(P[curP]) : null);
+  const r = CV.analyze(pctx.getImageData(0, 0, w, h).data, w, h, {
+    bg: idm ? 'light' : S.set.bg, sens: S.set.sens,
+    a4: idm || (S.set.a4 && S.set.bg === 'light'), measure: idm || !!exp, lenCheck: !exp
+  });
+  C.res = r;
+  if (!idm) {
+    if (exp && r.sheet) {
+      let odd = 0;
+      for (const c of r.comps) if (c.F && (c.kind === 'ok' || c.kind === 'len')) { const why = ID.mismatch(c.F, exp); if (why) { c.kind = 'other'; c.why = why; odd++; } }
+      if (odd) r.warn.push(odd === 1 ? '1 pieza no coincide: ¿esta es otra?' : `${odd} piezas no coinciden: ¿son otras?`);
+    }
+    CV.paint(r); drawOverlay(r); stabilize(r.count, ts); showWarn(r);
+  } else {
+    CV.paint(r); drawOverlay(r); idStep(r, ts);
+  }
+}
+// ---- seguimiento de cada pieza entre cuadros (para promediar la medida) ----
+function trackUpd(r) {
+  const tol = r.w * 0.04;
+  for (const t of C.tracks) t.miss++;
+  for (const c of r.comps) {
+    if (!c.F) continue;
+    let best = null, bd = tol;
+    for (const t of C.tracks) { if (t.miss === 0) continue; const dd = Math.hypot(t.x - c.cx, t.y - c.cy); if (dd < bd) { bd = dd; best = t; } }
+    if (!best) { best = { x: c.cx, y: c.cy, F: [], miss: 0 }; C.tracks.push(best); }
+    best.x = c.cx; best.y = c.cy; best.miss = 0; best.F.push(c.F); if (best.F.length > 20) best.F.shift();
+  }
+  C.tracks = C.tracks.filter(t => t.miss <= 8);
+}
+function setMeas(big, line, sm) { const h = `<span class="big">${esc(big)}</span>${esc(line || '')}${sm ? `<span class="sm">${esc(sm)}</span>` : ''}`; if ($('#cMeas').innerHTML !== h) $('#cMeas').innerHTML = h; }
+function idStep(r, ts) {
+  showWarn({ warn: r.sheet ? r.warn.filter(x => !/^A4/.test(x)) : [] });
+  if (!r.sheet) { C.tracks = []; C.meds = []; setMeas('Poné la hoja A4 entera en cuadro', '', 'Sobre una mesa más oscura, con el celu paralelo a la hoja'); paintCands(null, 'Sin hoja A4 no adivino'); $('#tSave').disabled = true; return; }
+  trackUpd(r);
+  const valid = C.tracks.filter(t => t.F.length >= 5);
+  if (!valid.length) { setMeas(r.comps.length ? 'Midiendo…' : 'Poné las piezas sobre la hoja', '', 'Sin que se toquen, quietas unos segundos'); paintCands(null, 'Midiendo…'); $('#tSave').disabled = true; return; }
+  const meds = valid.map(t => ID.medF(t.F)), M = ID.medF(meds);
+  const rng = a => Math.max(...a) - Math.min(...a);
+  const mixed = meds.length > 1 && (M.hole ? rng(meds.map(m => m.top.Deq)) > 2 : (rng(meds.map(m => m.side.Ls)) > 2 || rng(meds.map(m => m.side.d)) > 1.2) || meds.some(m => m.hole !== M.hole));
+  C.meds = meds;
+  const t = measText(M);
+  setMeas(t.big, t.line, t.sm);
+  if (C.mode === 'teach') {
+    $('#tStat').textContent = `${meds.length} pieza${meds.length === 1 ? '' : 's'} medida${meds.length === 1 ? '' : 's'}` + (meds.length < 5 ? ' · lo ideal son 5' : ' ✔') + (mixed ? ' · ¡no parecen iguales!' : '');
+    $('#tSave').disabled = false; $('#tSave').textContent = `Guardar medida (${meds.length})`;
+    return;
+  }
+  if (ts - C.candT < 600) return;
+  C.candT = ts;
+  const list = P.filter(p => S.set.filter === 'all' || p.cat === S.set.filter);
+  paintCands(ID.rank(M, list, SPECS, S.learn).slice(0, 3), null, mixed);
+}
+// 3 botones fijos que se actualizan en el lugar (para que el toque no se pierda)
+let candEls = null;
+function paintCands(rk, status, mixed) {
+  if (!candEls) {
+    $('#idCands').innerHTML = '<div class="unsure" id="idNote" hidden></div>' + [0, 1, 2].map(i => `<button class="cand" data-k="${i}" hidden></button>`).join('');
+    candEls = Array.from(document.querySelectorAll('#idCands .cand'));
+  }
+  $('#idFilt').textContent = 'Filtro: ' + (S.set.filter === 'all' ? 'Todos' : S.set.filter);
+  const note = $('#idNote');
+  if (!rk || !rk.length) { candEls.forEach(b => b.hidden = true); note.hidden = true; $('#idStat').textContent = status || 'Midiendo…'; return; }
+  $('#idStat').textContent = 'Tocá el correcto';
+  const notes = [];
+  if (rk[0].sc < 70) notes.push('No estoy seguro, revisá la medida');
+  if (rk[1] && rk[0].p.cat !== rk[1].p.cat && baseName(rk[0].p.name) === baseName(rk[1].p.name) && Math.abs(rk[0].sc - rk[1].sc) < 3) notes.push('AISI y SAE miden igual: elegí vos');
+  if (mixed) notes.push('Las piezas no parecen iguales: dejá un solo tipo');
+  note.hidden = !notes.length; note.textContent = notes.join(' · ');
+  candEls.forEach((b, k) => {
+    const x = rk[k]; if (!x) { b.hidden = true; return; }
+    b.hidden = false; b.dataset.i = x.p.i;
+    b.className = 'cand' + (k === 0 && x.sc >= 70 ? ' top' : '') + (x.sc < 70 ? ' low' : '');
+    const h = `${tag(x.p.cat)}<span class="cn">${esc(x.p.name)}<span class="cs"><br>Sistema ${fmt(x.p.stock)} · medida ${x.src}</span></span><span class="pc">${Math.round(x.sc)}%</span>`;
+    if (b.innerHTML !== h) b.innerHTML = h;
+  });
+}
+$('#idCands').addEventListener('click', e => {
+  const b = e.target.closest('.cand'); if (!b || b.hidden) return;
+  const i = +b.dataset.i, p = P[i];
+  if (C.meds.length) { S.learn[p.id] = (S.learn[p.id] || []).concat(C.meds.slice(0, 5)).slice(-15); LS.set('bc_learn', S.learn); }
+  curP = i; vibe(40);
+  history.replaceState({ s: 'product', p: curP }, '');
+  history.pushState({ s: 'product', p: curP, cam: 1 }, '');
+  go('product', false);
+  setMode('count');
+  toast('Listo, ahora contá ' + p.name);
+});
+$('#idFilt').onclick = () => { const o = ['all', 'AISI', 'SAE']; S.set.filter = o[(o.indexOf(S.set.filter) + 1) % 3]; saveSet(); C.candT = 0; paintCands(null, 'Midiendo…'); document.querySelectorAll('#seg button').forEach(b => b.classList.toggle('on', b.dataset.f === S.set.filter)); };
+$('#idClose').onclick = () => history.back();
+$('#tClose').onclick = () => history.back();
+$('#tSave').onclick = () => {
+  if (!C.meds.length) return;
+  const id = P[curP].id;
+  S.learn[id] = (S.learn[id] || []).concat(C.meds.slice(0, 5)).slice(-15); LS.set('bc_learn', S.learn);
+  toast(`Medida guardada (${Math.min(5, C.meds.length)} piezas)`);
+  history.back();
+};
+function drawOverlay(r) {
+  const W = ovc.width, H = ovc.height, sx = W / r.w, sy = H / r.h;
+  occtx.putImageData(new ImageData(new Uint8ClampedArray(r.ov.buffer, 0, r.w * r.h * 4), r.w, r.h), 0, 0);
+  octx.clearRect(0, 0, W, H);
+  octx.imageSmoothingEnabled = true;
+  octx.drawImage(oc, 0, 0, W, H);
+  if (r.sheet) {
+    octx.strokeStyle = '#6cc3ff'; octx.lineWidth = 2; octx.setLineDash([8, 6]);
+    octx.strokeRect(r.sheet.x0 * sx, r.sheet.y0 * sy, (r.sheet.x1 - r.sheet.x0) * sx, (r.sheet.y1 - r.sheet.y0) * sy);
+    octx.setLineDash([]);
+  }
+  if (r.comps.length > 250) return;
+  const fs = Math.max(11, Math.min(18, Math.round(Math.sqrt(W * H / Math.max(1, r.comps.length)) / 5)));
+  octx.font = `800 ${fs}px system-ui,sans-serif`; octx.textAlign = 'center'; octx.textBaseline = 'middle';
+  octx.lineJoin = 'round'; octx.lineWidth = Math.max(3, fs / 4);
+  let idx = 0;
+  for (const c of r.comps) {
+    let txt;
+    if (c.kind === 'big') txt = '✕';
+    else if (c.kind === 'clump') { txt = `${idx + 1}-${idx + c.n}`; idx += c.n; }
+    else if (c.kind === 'other') txt = (++idx) + '?';
+    else txt = String(++idx);
+    const x = c.cx * sx, y = c.cy * sy;
+    octx.strokeStyle = 'rgba(0,0,0,.85)'; octx.strokeText(txt, x, y);
+    octx.fillStyle = c.kind === 'ok' ? '#fff' : c.kind === 'clump' ? '#ffd23f' : c.kind === 'len' ? '#ff8c42' : c.kind === 'other' ? '#ff4040' : '#aaa';
+    octx.fillText(txt, x, y);
+    if (c.len && r.lenMed) {
+      const t2 = c.F ? (c.F.hole ? 'Ø' + fmtd(c.F.top.Deq, 0) : fmtd(c.F.side.Ls, 0) + 'mm') : fmtd(c.len, 0) + 'mm'; const f2 = Math.round(fs * 0.7);
+      octx.font = `700 ${f2}px system-ui,sans-serif`;
+      octx.strokeText(t2, x, y + fs); octx.fillText(t2, x, y + fs);
+      octx.font = `800 ${fs}px system-ui,sans-serif`;
+    }
+  }
+}
+function stabilize(n, ts) {
+  C.hist.push(n); if (C.hist.length > 15) C.hist.shift();
+  const f = new Map(); let mode = n, bf = 0;
+  for (let i = 0; i < C.hist.length; i++) { const v = C.hist[i]; const k = (f.get(v) || 0) + 1; f.set(v, k); if (k >= bf) { bf = k; mode = v; } }
+  if (mode !== C.shown || !C.since) { C.shown = mode; C.since = ts; }
+  const stable = C.hist.length >= 8 && ts - C.since >= 1000;
+  $('#cNum').textContent = fmt(C.shown);
+  const el = $('#cStable');
+  el.textContent = stable ? 'estable ✔' : 'estabilizando…';
+  el.className = stable ? 'ok' : '';
+}
+function showWarn(r) {
+  const items = r.warn.slice();
+  let info = '';
+  if (r.sheet && r.lenMed && curP != null) {
+    const m = P[curP].name.match(/M\d+(?:[.,]\d+)?\s*x\s*(\d+)/i);
+    const ls = (r.comps || []).filter(c => c.F && !c.F.hole).map(c => c.F.side.Ls).sort((a, b) => a - b);
+    info = ls.length ? `Vástago medio ${fmtd(ls[ls.length >> 1], 1)} mm` + (m ? ` (nominal ${m[1]})` : '') : `Largo total medio ${fmtd(r.lenMed, 1)} mm`;
+  }
+  const s = items.join('|') + '#' + info;
+  if (s === C.warnStr) return; C.warnStr = s;
+  $('#cWarn').innerHTML = items.map(w => `<div>${esc(w)}</div>`).join('') + (info ? `<div class="info">${esc(info)}</div>` : '');
+}
+$('#cBg').onclick = () => { S.set.bg = S.set.bg === 'light' ? 'dark' : 'light'; saveSet(); paintTools(); C.hist = []; };
+$('#cA4').onclick = () => { S.set.a4 = !S.set.a4; saveSet(); paintTools(); C.hist = []; toast(S.set.a4 ? 'Poné la hoja A4 entera en cuadro, sobre una mesa más oscura' : 'Escala A4 apagada'); };
+$('#cSens').oninput = e => { S.set.sens = +e.target.value; saveSet(); C.hist = []; };
+$('#cTorch').onclick = $('#idTorch').onclick = async () => {
+  try { C.torch = !C.torch; await C.track.applyConstraints({ advanced: [{ torch: C.torch }] }); }
+  catch (e) { C.torch = false; toast('Este celu no deja prender la linterna'); }
+  paintTools();
+};
+$('#cClose').onclick = () => history.back();
+$('#cFix').onclick = () => {
+  if (!C.stream) { toast('La cámara no está andando'); return; }
+  const n = C.shown;
+  if (!n) { toast('No hay piezas contadas'); return; }
+  const unstable = $('#cStable').className !== 'ok';
+  C.frozen = true; vid.pause(); vibe(60);
+  const id = P[curP].id;
+  C.bIdx = addBatch(id, n, 'cam');
+  $('#cCtl').hidden = true; $('#cFrz').hidden = false;
+  paintFrz();
+  if (unstable) toast('Ojo: el número todavía no estaba estable');
+};
+function paintFrz() {
+  const id = P[curP].id, b = batchesOf(id)[C.bIdx];
+  $('#fHead').textContent = `Tanda ${C.bIdx + 1} sumada · corregí si hace falta`;
+  $('#fN').textContent = b ? fmt(b.n) : '0';
+  $('#fTot').textContent = fmt(totalOf(id));
+}
+function adjFrz(dv) {
+  const id = P[curP].id, b = batchesOf(id)[C.bIdx]; if (!b) return;
+  b.n = Math.max(0, b.n + dv); saveCounts(); paintFrz(); vibe(10);
+}
+$('#fMinus').onclick = () => adjFrz(-1);
+$('#fPlus').onclick = () => adjFrz(1);
+$('#fUndo').onclick = () => { delBatch(P[curP].id, C.bIdx); toast('Tanda deshecha'); resume(); };
+function resume() {
+  const id = P[curP].id, b = batchesOf(id)[C.bIdx];
+  if (b && b.n === 0) delBatch(id, C.bIdx);
+  C.frozen = false; C.hist = []; C.since = 0; vid.play().catch(() => {});
+  $('#cTot').textContent = fmt(totalOf(id));
+  $('#cCtl').hidden = false; $('#cFrz').hidden = true;
+}
+$('#fNext').onclick = resume;
+$('#fDone').onclick = () => { resume(); history.back(); };
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && C.on && !C.wake) { try { C.wake = await navigator.wakeLock.request('screen'); } catch (e) {} }
+  if (document.visibilityState === 'hidden') C.wake = null;
+});
+
+// ---------- inicio ----------
+history.replaceState({ s: 'home' }, '');
+setFilter(S.set.filter);
+updBadge();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
